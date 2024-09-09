@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dallas Stars Trivia Game</title>
+  <style>
+    body {
+      background-color: #004c36;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    #questionContainer, #leaderboardContainer {
+      margin-top: 20px;
+      display: none;
+    }
+    button {
+      background-color: #006847;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #00382b;
+    }
+    .correct {
+      background-color: green !important;
+      transform: scale(1.2);
+      transition: all 0.2s ease-in-out;
+    }
+    .incorrect {
+      background-color: red !important;
+      transform: scale(0.8);
+      transition: all 0.2s ease-in-out;
+    }
+  </style>
+</head>
+<body>
+  <h1>Dallas Stars Trivia Game</h1>
+  <div id="startPage">
+    <button onclick="startQuiz()">Start Quiz</button>
+    <button onclick="viewLeaderboard()">View Leaderboard</button>
+  </div>
+  <div id="questionContainer"></div>
+  <div id="leaderboardContainer"></div>
+
+  <script>
+    let questions = [];
+    let currentQuestionIndex = 0;
+    let score = 0;
+    let timer;
+    let timeBonus = 0;
+
+    const googleAppsScriptURL = 'https://script.google.com/macros/s/AKfycbyhs43lBUGH1MYZjoV99cjZLokh_Qij62Jx0f7t3Ir6I6h82y55532lsK7Uxs4Qmf49Rw/exec';
+
+    function startQuiz() {
+      fetch(googleAppsScriptURL + '?action=getQuestions')
+        .then(response => response.json())
+        .then(data => {
+          questions = data;
+          document.getElementById('startPage').style.display = 'none';
+          document.getElementById('questionContainer').style.display = 'block';
+          displayNextQuestion();
+        });
+    }
+
+    function displayNextQuestion() {
+      if (currentQuestionIndex >= questions.length) {
+        finishQuiz();
+        return;
+      }
+
+      const questionData = questions[currentQuestionIndex];
+      const questionContainer = document.getElementById('questionContainer');
+      
+      questionContainer.innerHTML = `
+        <div>
+          <h2>Question ${currentQuestionIndex + 1}</h2>
+          <p>${questionData[0]}</p>
+          <div>
+            <button onclick="submitAnswer('${questionData[1]}', '${questionData[2]}', this)">A: ${questionData[2]}</button>
+            <button onclick="submitAnswer('${questionData[1]}', '${questionData[3]}', this)">B: ${questionData[3]}</button>
+            <button onclick="submitAnswer('${questionData[1]}', '${questionData[4]}', this)">C: ${questionData[4]}</button>
+            <button onclick="submitAnswer('${questionData[1]}', '${questionData[5]}', this)">D: ${questionData[5]}</button>
+          </div>
+          <div id="scoreDisplay">Score: ${score}</div>
+        </div>
+      `;
+
+      startTimer();
+    }
+
+    function startTimer() {
+      let timeLeft = 30; // 30 seconds for each question
+      timeBonus = 0;
+      timer = setInterval(function() {
+        if (timeLeft <= 0) {
+          clearInterval(timer);
+          timeBonus = 0;
+          return;
+        }
+        timeBonus = timeLeft;
+        document.getElementById('scoreDisplay').innerText = `Score: ${score} | Time left: ${timeLeft}`;
+        timeLeft -= 1;
+      }, 1000);
+    }
+
+    function submitAnswer(correctAnswer, selectedAnswer, button) {
+      clearInterval(timer);
+
+      if (selectedAnswer === correctAnswer) {
+        score += 10 + timeBonus;
+        button.classList.add('correct');
+      } else {
+        button.classList.add('incorrect');
+      }
+
+      setTimeout(() => {
+        highlightCorrectAnswer(correctAnswer);
+      }, 500);
+
+      setTimeout(() => {
+        currentQuestionIndex++;
+        displayNextQuestion();
+      }, 2000);
+    }
+
+    function highlightCorrectAnswer(correctAnswer) {
+      const buttons = document.querySelectorAll('#questionContainer button');
+      buttons.forEach(button => {
+        if (button.innerText.includes(correctAnswer)) {
+          button.classList.add('correct');
+        }
+      });
+    }
+
+    function finishQuiz() {
+      const initials = prompt('Quiz completed! Enter your initials:');
+      if (initials) {
+        fetch(googleAppsScriptURL + '?action=submitScore&initials=' + initials + '&score=' + score)
+          .then(() => {
+            alert('Score submitted successfully!');
+            viewLeaderboard();
+          });
+      }
+    }
+
+    function viewLeaderboard() {
+      document.getElementById('startPage').style.display = 'none';
+      document.getElementById('questionContainer').style.display = 'none';
+      document.getElementById('leaderboardContainer').style.display = 'block';
+      
+      fetch(googleAppsScriptURL + '?action=getLeaderboard')
+        .then(response => response.json())
+        .then(data => {
+          displayLeaderboard(data);
+        });
+    }
+
+    function displayLeaderboard(leaderboardData) {
+      const leaderboardDiv = document.getElementById('leaderboardContainer');
+      leaderboardDiv.innerHTML = '<h2>Leaderboard</h2>';
+      
+      if (!leaderboardData || leaderboardData.length === 0) {
+        leaderboardDiv.innerHTML += '<p>No scores available yet.</p>';
+      } else {
+        leaderboardData.forEach((entry, index) => {
+          const row = document.createElement('div');
+          row.innerText = `${index + 1}. ${entry[0]} - ${entry[1]} points`;
+          leaderboardDiv.appendChild(row);
+        });
+      }
+
+      const goBackButton = document.createElement('button');
+      goBackButton.innerText = 'Go to Start';
+      goBackButton.onclick = () => {
+        leaderboardDiv.style.display = 'none';
+        document.getElementById('startPage').style.display = 'block';
+      };
+      leaderboardDiv.appendChild(goBackButton);
+    }
+  </script>
+</body>
+</html>
